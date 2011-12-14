@@ -322,7 +322,7 @@ class TestOfPostMySQLDAO extends ThinkUpUnitTestCase {
         'post_text'=>'@user3, you are rad.', 'source'=>'web', 'pub_date'=>'2006-03-01 00:00:00',
         'old_retweet_count_cache' => 0, 'in_rt_of_user_id' => null,
         'reply_count_cache'=>0, 'retweet_count_cache'=>0, 'network'=>'twitter',
-        'in_reply_to_user_id' =>'23', 'in_reply_to_post_id' => null));
+        'in_reply_to_user_id' =>'23', 'in_reply_to_post_id' => null));       
 
         array_push($builders, $post_builder);
         $post_key = $post_builder->columns['last_insert_id'];
@@ -2826,4 +2826,297 @@ class TestOfPostMySQLDAO extends ThinkUpUnitTestCase {
         $post = $dao->getPost(10, 'twitter');
         $this->assertEqual($post->post_text, 'This is updated post 10');
     }
+    
+    public function testGetAllCheckins(){
+        // Add a foursquare checkin
+        $checkin_builder[] = FixtureBuilder::build('posts', array('post_id'=>'147', 'author_user_id'=>'20',
+        'author_username'=>'user1', 'author_fullname'=>'User 1', 'network'=>'foursquare',
+        'post_text'=>'I just checked in', 'source'=>'', 'pub_date'=>'2006-03-01 00:00:00', 'location'=>'England',
+        'old_retweet_count_cache' => 0, 'in_rt_of_user_id' => null, 'place'=>'The Park', 'place_id'=>'12345a',
+        'reply_count_cache'=>0, 'retweet_count_cache'=>0, 'network'=>'foursquare', 
+        'in_reply_to_user_id' =>'23', 'in_reply_to_post_id' => null,
+        'geo'=>'52.477192843264,-1.484333726346')); 
+        
+        /* Add the place information for this foursquare checkin (We do it this way due to the fixture builder not
+           being able to handle the MySQL point type */ 
+        $place_dao = new PlaceMySQLDAO();
+        // Set all possible fields 
+        $places['id'] = '12345a';
+        $places['place_type'] = "Park";
+        $places['name'] = "A Park";
+        $places['full_name'] = "The Greatest Park";
+        $places['country_code'] = "UK";
+        $places['country'] = "United Kingdom";
+        $places['icon'] = "http://www.iconlocation.com"; 
+        $places['lat_lng'] = 'POINT(51.514 -0.1167)';
+        $places['bounding_box'] = 'POLYGON((-0.213503 51.512805,-0.105303 51.512805,-0.105303 51.572068,'.
+         '-0.213503 51.572068, -0.213503 51.512805)))';
+        
+        // Insert the place
+        $place_dao->insertGenericPlace($places, 1234, 'foursquare');
+        
+        // Add A link for this checkin
+        $checkin_builder[] = FixtureBuilder::build('links', array('post_key'=>'20020', 'url'=>'http://bit.ly/blah'));
+        
+        // Query the database for the checkin and check its returned
+        $post_dao = new PostMySQLDAO();
+        $res = $post_dao->getAllCheckins(20, 'foursquare');
+        
+        
+        // Check only the 1 checkin we inserted is returned
+        $this->assertEqual(sizeof($res), 1);
+        // Check the author user id was set correctly
+        $this->assertEqual($res[0]->author_user_id, '20');
+        // Check the username was set correctly
+        $this->assertEqual($res[0]->author_username, 'user1');       
+        // Check the author fullname was set correctly
+        $this->assertEqual($res[0]->author_fullname, 'User 1');
+        // Check the network was set correctly
+        $this->assertEqual($res[0]->network, 'foursquare');
+        // Check the post text was set correctly
+        $this->assertEqual($res[0]->post_text, 'I just checked in');
+        // Check the pub date was set correctly
+        $this->assertEqual($res[0]->pub_date, '2006-03-01 00:00:00');
+        // Check the location was set correctly
+        $this->assertEqual($res[0]->location, 'England');
+        // Check the place was set correctly
+        $this->assertEqual($res[0]->place, 'The Park');
+        // Check the place id was set correctly
+        $this->assertEqual($res[0]->place_id, '12345a');      
+        // Check the geo co ordinates were set correctly
+        $this->assertEqual($res[0]->geo, '52.477192843264,-1.484333726346');    
+     
+        
+        // Check the place id was set correctly
+        $this->assertEqual($res[0]->place_obj->place_id, '12345a');
+        // Check the place type was set correctly
+        $this->assertEqual($res[0]->place_obj->place_type, 'Park');
+        // Check the place name was set correctly
+        $this->assertEqual($res[0]->place_obj->name, 'A Park');
+        // Check the full name was set correctly
+        $this->assertEqual($res[0]->place_obj->full_name, 'The Greatest Park');
+        // Check the country code was set correctly
+        $this->assertEqual($res[0]->place_obj->country_code, 'UK');
+        // Check the country was set correctly
+        $this->assertEqual($res[0]->place_obj->country, 'United Kingdom');
+        // Check the icon was set correctly
+        $this->assertEqual($res[0]->place_obj->icon, 'http://www.iconlocation.com');
+        
+        // Check the URL was set correctly
+        $this->assertEqual($res[0]->links[0]->url, 'http://bit.ly/blah');
+    }
+    
+    public function testGetAllCheckinsFromYear(){
+        // Add a foursquare checkin
+        $checkin_builder[] = FixtureBuilder::build('posts', array('post_id'=>'147', 'author_user_id'=>'20',
+        'author_username'=>'user1', 'author_fullname'=>'User 1', 'network'=>'foursquare',
+        'post_text'=>'I just checked in', 'source'=>'', 'pub_date'=>'2011-02-21 00:00:00', 'location'=>'England',
+        'old_retweet_count_cache' => 0, 'in_rt_of_user_id' => null, 'place'=>'The Park', 'place_id'=>'12345a',
+        'reply_count_cache'=>0, 'retweet_count_cache'=>0, 'network'=>'foursquare', 
+        'in_reply_to_user_id' =>'23', 'in_reply_to_post_id' => null,
+        'geo'=>'52.477192843264,-1.484333726346')); 
+        
+        /* Add the place information for this foursquare checkin (We do it this way due to the fixture builder not
+           being able to handle the MySQL point type */ 
+        $place_dao = new PlaceMySQLDAO();
+        // Set all possible fields 
+        $places['id'] = '12345a';
+        $places['place_type'] = "Park";
+        $places['name'] = "A Park";
+        $places['full_name'] = "The Greatest Park";
+        $places['country_code'] = "UK";
+        $places['country'] = "United Kingdom";
+        $places['icon'] = "http://www.iconlocation.com"; 
+        $places['lat_lng'] = 'POINT(51.514 -0.1167)';
+        $places['bounding_box'] = 'POLYGON((-0.213503 51.512805,-0.105303 51.512805,-0.105303 51.572068,'.
+         '-0.213503 51.572068, -0.213503 51.512805)))';
+        
+        // Insert the place
+        $place_dao->insertGenericPlace($places, 1234, 'foursquare');
+        
+        // Add A link for this checkin
+        $checkin_builder[] = FixtureBuilder::build('links', array('post_key'=>'20020', 'url'=>'http://bit.ly/blah'));
+        
+        // Query the database for the checkin from 2011 and check its returned
+        $post_dao = new PostMySQLDAO();
+        $res = $post_dao->getAllCheckinsFromYear(20, 'foursquare', 2011);
+        
+        
+        // Check only the 1 checkin we inserted is returned
+        $this->assertEqual(sizeof($res), 1);
+        // Check the author user id was set correctly
+        $this->assertEqual($res[0]->author_user_id, '20');
+        // Check the username was set correctly
+        $this->assertEqual($res[0]->author_username, 'user1');       
+        // Check the author fullname was set correctly
+        $this->assertEqual($res[0]->author_fullname, 'User 1');
+        // Check the network was set correctly
+        $this->assertEqual($res[0]->network, 'foursquare');
+        // Check the post text was set correctly
+        $this->assertEqual($res[0]->post_text, 'I just checked in');
+        // Check the pub date was set correctly
+        $this->assertEqual($res[0]->pub_date, '2011-02-21 00:00:00');
+        // Check the location was set correctly
+        $this->assertEqual($res[0]->location, 'England');
+        // Check the place was set correctly
+        $this->assertEqual($res[0]->place, 'The Park');
+        // Check the place id was set correctly
+        $this->assertEqual($res[0]->place_id, '12345a');      
+        // Check the geo co ordinates were set correctly
+        $this->assertEqual($res[0]->geo, '52.477192843264,-1.484333726346');    
+     
+        
+        // Check the place id was set correctly
+        $this->assertEqual($res[0]->place_obj->place_id, '12345a');
+        // Check the place type was set correctly
+        $this->assertEqual($res[0]->place_obj->place_type, 'Park');
+        // Check the place name was set correctly
+        $this->assertEqual($res[0]->place_obj->name, 'A Park');
+        // Check the full name was set correctly
+        $this->assertEqual($res[0]->place_obj->full_name, 'The Greatest Park');
+        // Check the country code was set correctly
+        $this->assertEqual($res[0]->place_obj->country_code, 'UK');
+        // Check the country was set correctly
+        $this->assertEqual($res[0]->place_obj->country, 'United Kingdom');
+        // Check the icon was set correctly
+        $this->assertEqual($res[0]->place_obj->icon, 'http://www.iconlocation.com');
+        
+        // Check the URL was set correctly
+        $this->assertEqual($res[0]->links[0]->url, 'http://bit.ly/blah');
+    }
+    
+    public function testcountCheckinsToPlaceTypes(){
+        // Add some foursquare checkins
+        $checkin_builder[] = FixtureBuilder::build('posts', array('post_id'=>'147', 'author_user_id'=>'20',
+        'author_username'=>'user1', 'author_fullname'=>'User 1', 'network'=>'foursquare',
+        'post_text'=>'I just checked in', 'source'=>'', 'pub_date'=>'2011-02-21 00:00:00', 'location'=>'England',
+        'old_retweet_count_cache' => 0, 'in_rt_of_user_id' => null, 'place'=>'The Park', 'place_id'=>'12345a',
+        'reply_count_cache'=>0, 'retweet_count_cache'=>0, 'network'=>'foursquare', 
+        'in_reply_to_user_id' =>'23', 'in_reply_to_post_id' => null,
+        'geo'=>'52.477192843264,-1.484333726346')); 
+        
+        $checkin_builder[] = FixtureBuilder::build('posts', array('post_id'=>'148', 'author_user_id'=>'20',
+        'author_username'=>'user1', 'author_fullname'=>'User 1', 'network'=>'foursquare',
+        'post_text'=>'I just checked in again', 'source'=>'', 'pub_date'=>'2011-02-21 00:00:00', 'location'=>'England',
+        'old_retweet_count_cache' => 0, 'in_rt_of_user_id' => null, 'place'=>'The Garage', 'place_id'=>'12346',
+        'reply_count_cache'=>0, 'retweet_count_cache'=>0, 'network'=>'foursquare', 
+        'in_reply_to_user_id' =>'23', 'in_reply_to_post_id' => null,
+        'geo'=>'52.477192843264,-1.484333726346')); 
+        
+        /* Add the place information for these foursquare checkins (We do it this way due to the fixture builder not
+           being able to handle the MySQL point type */ 
+        $place_dao = new PlaceMySQLDAO();
+        // Set all possible fields 
+        $places['id'] = '12345a';
+        $places['place_type'] = "Park";
+        $places['name'] = "A Park";
+        $places['full_name'] = "The Greatest Park";
+        $places['country_code'] = "UK";
+        $places['country'] = "United Kingdom";
+        $places['icon'] = "http://www.iconlocation.com"; 
+        $places['lat_lng'] = 'POINT(51.514 -0.1167)';
+        $places['bounding_box'] = 'POLYGON((-0.213503 51.512805,-0.105303 51.512805,-0.105303 51.572068,'.
+         '-0.213503 51.572068, -0.213503 51.512805)))';
+        
+        // Insert the place
+        $place_dao->insertGenericPlace($places, 1234, 'foursquare');
+        
+        // Set all possible fields 
+        $places['id'] = '12346';
+        $places['place_type'] = "Garage";
+        $places['name'] = "A Garage";
+        $places['full_name'] = "The Greatest Garage";
+        $places['country_code'] = "UK";
+        $places['country'] = "United Kingdom";
+        $places['icon'] = "http://www.iconlocation.com"; 
+        $places['lat_lng'] = 'POINT(51.514 -0.1167)';
+        $places['bounding_box'] = 'POLYGON((-0.213503 51.512805,-0.105303 51.512805,-0.105303 51.572068,'.
+         '-0.213503 51.572068, -0.213503 51.512805)))';
+        
+        // Insert the place
+        $place_dao->insertGenericPlace($places, 1234, 'foursquare');
+        
+        // Query the database for the number of checkins per type of place
+        $post_dao = new PostMySQLDAO();
+        $res = $post_dao->countCheckinsToPlaceTypes('20', 'foursquare');
+        
+        // Check the counts came back correctly
+        $this->assertEqual($res[0]['place_type'], 'Garage');
+        $this->assertEqual($res[0]['COUNT(place_type)'], 1);
+        $this->assertEqual($res[1]['place_type'], 'Park');
+        $this->assertEqual($res[1]['COUNT(place_type)'], 1);        
+
+    }
+    
+    public function testCountCheckinsPerHourAllTime(){
+        // Add some foursquare checkins
+        $checkin_builder[] = FixtureBuilder::build('posts', array('post_id'=>'147', 'author_user_id'=>'20',
+        'author_username'=>'user1', 'author_fullname'=>'User 1', 'network'=>'foursquare',
+        'post_text'=>'I just checked in', 'source'=>'', 'pub_date'=>'2011-02-21 09:50:00', 'location'=>'England',
+        'old_retweet_count_cache' => 0, 'in_rt_of_user_id' => null, 'place'=>'The Park', 'place_id'=>'12345a',
+        'reply_count_cache'=>0, 'retweet_count_cache'=>0, 'network'=>'foursquare', 
+        'in_reply_to_user_id' =>'23', 'in_reply_to_post_id' => null,
+        'geo'=>'52.477192843264,-1.484333726346')); 
+        
+        $checkin_builder[] = FixtureBuilder::build('posts', array('post_id'=>'148', 'author_user_id'=>'20',
+        'author_username'=>'user1', 'author_fullname'=>'User 1', 'network'=>'foursquare',
+        'post_text'=>'I just checked in again', 'source'=>'', 'pub_date'=>'2011-02-21 22:00:00', 'location'=>'England',
+        'old_retweet_count_cache' => 0, 'in_rt_of_user_id' => null, 'place'=>'The Garage', 'place_id'=>'12346',
+        'reply_count_cache'=>0, 'retweet_count_cache'=>0, 'network'=>'foursquare', 
+        'in_reply_to_user_id' =>'23', 'in_reply_to_post_id' => null,
+        'geo'=>'52.477192843264,-1.484333726346')); 
+        
+             
+        // Query the database for the number of checkins per hour
+        $post_dao = new PostMySQLDAO();
+        $res = $post_dao->countCheckinsPerHourAllTime('20', 'foursquare');
+        
+        // Check the counts came back correctly
+        $this->assertEqual($res[0]['HOUR(pub_date)'], 9);
+        $this->assertEqual($res[0]['COUNT(HOUR(pub_date))'], 1);
+        $this->assertEqual($res[1]['HOUR(pub_date)'], 22);
+        $this->assertEqual($res[1]['COUNT(HOUR(pub_date))'], 1);       
+
+    }
+    
+    public function testCountCheckinsPerHourLastWeek(){
+        // Build the pub_date string which needs to be a date within the last week
+        $pub1 = date(date( 'Y-m-d H:i:s' , strtotime("now")));
+        $pub2 = date(date( 'Y-m-d H:i:s' , strtotime("now +1 hour")));
+        
+        // Add some foursquare checkins
+        $checkin_builder[] = FixtureBuilder::build('posts', array('post_id'=>'147', 'author_user_id'=>'20',
+        'author_username'=>'user1', 'author_fullname'=>'User 1', 'network'=>'foursquare',
+        'post_text'=>'I just checked in', 'source'=>'', 'pub_date'=>$pub1, 'location'=>'England',
+        'old_retweet_count_cache' => 0, 'in_rt_of_user_id' => null, 'place'=>'The Park', 'place_id'=>'12345a',
+        'reply_count_cache'=>0, 'retweet_count_cache'=>0, 'network'=>'foursquare', 
+        'in_reply_to_user_id' =>'23', 'in_reply_to_post_id' => null,
+        'geo'=>'52.477192843264,-1.484333726346')); 
+        
+        $checkin_builder[] = FixtureBuilder::build('posts', array('post_id'=>'148', 'author_user_id'=>'20',
+        'author_username'=>'user1', 'author_fullname'=>'User 1', 'network'=>'foursquare',
+        'post_text'=>'I just checked in again', 'source'=>'', 'pub_date'=>$pub2, 'location'=>'England',
+        'old_retweet_count_cache' => 0, 'in_rt_of_user_id' => null, 'place'=>'The Garage', 'place_id'=>'12346',
+        'reply_count_cache'=>0, 'retweet_count_cache'=>0, 'network'=>'foursquare', 
+        'in_reply_to_user_id' =>'23', 'in_reply_to_post_id' => null,
+        'geo'=>'52.477192843264,-1.484333726346')); 
+        
+             
+        // Query the database for the number of checkins per hour
+        $post_dao = new PostMySQLDAO();
+        $res = $post_dao->countCheckinsPerHourAllTime('20', 'foursquare');
+        
+        // Check the counts came back correctly
+        $this->assertEqual($res[0]['HOUR(pub_date)'], date(date( 'H' , strtotime("now"))));
+        $this->assertEqual($res[0]['COUNT(HOUR(pub_date))'], 1);
+        $this->assertEqual($res[1]['HOUR(pub_date)'], date(date( 'H' , strtotime("now +1 hour"))));
+        $this->assertEqual($res[1]['COUNT(HOUR(pub_date))'], 1);       
+
+    }
+    
+    
+
+
+    
+    
 }

@@ -1672,4 +1672,187 @@ class PostMySQLDAO extends PDODAO implements PostDAO  {
         $ps = $this->execute($q, $vars);
         return $this->getUpdateCount($ps);
     }
+    
+    /*
+     * Returns all checkins, along with place information and any links attached to the checkin
+     */
+    public function getAllCheckins($author_id, $network) {
+
+        // Get the checkins from the database for this user
+        $q = "SELECT * FROM #prefix#posts WHERE author_user_id=:author AND network=:network ";
+        $q .= " AND in_reply_to_post_id IS null ORDER BY pub_date DESC ";
+        $vars = array(
+             ':author'=>$author_id,
+             ':network'=>$network
+         );
+        
+        $ps = $this->execute($q, $vars);
+        $all_rows = $this->getDataRowsAsArrays($ps);
+                
+        // Get all the post ids of the checkins (we use this later for our link query) 
+        $post_keys_array = array();
+        foreach ($all_rows as $row) {
+            $post_keys_array[] = $row['id'];
+        }
+       
+        // An array to store each post object in for the checkins
+        $all_posts = array();
+        foreach ($all_rows as $row) {
+            // Not sure what this is but our checkins dont have one so we need to set it to a blank string
+            $row['adj_pub_date'] = "";
+            // Create a new post object from the row in the table
+            $data = new Post($row);
+            
+            // Get the place data from the database
+            $q1 = "SELECT * FROM #prefix#places WHERE place_id=:place";
+            $vars1 = array(
+                ':place'=>$row['place_id']);
+            $ps1 = $this->execute($q1, $vars1);
+            $place_row = $this->getDataRowsAsArrays($ps1);
+           
+            // Create a place object from the data in our table
+            $data->place_obj = new Place($place_row[0]);
+           
+            // Query for all the links related to these posts / checkins
+            $q2 = "SELECT * FROM #prefix#links WHERE post_key in (".implode(",", $post_keys_array).")";
+            $ps2 = $this->execute($q2);
+            $all_link_rows = $this->getDataRowsAsArrays($ps2);
+           
+            // For each link returned if it equals the post id of this post add the link to this post
+            foreach ($all_link_rows as $link_row) {
+                if ($link_row['post_key'] == $data->id) {
+                    $data->addLink(new Link($link_row));
+                }
+            } 
+           
+            // Now we have all the information for this post store it in our array of all posts 
+            $all_posts[] = $data;
+           
+        }
+           
+        return $all_posts; 
+    }
+   
+    /*
+     * Returns checkins from this day in year $year
+     */
+    public function getAllCheckinsFromYear($author_id, $network, $year) {
+              
+        // Get the checkins from X years ago
+        $q = "SELECT * FROM #prefix#posts "; 
+        $q .= " WHERE (YEAR(pub_date)=:year) AND "; 
+        $q .= " (DAYOFMONTH(pub_date)=DAYOFMONTH(CURRENT_DATE())) AND (MONTH(pub_date)=MONTH(CURRENT_DATE())) ";
+        $q .= " AND author_user_id=:author AND network=:network AND in_reply_to_post_id IS null ORDER BY pub_date DESC ";
+        $vars = array(
+            ':year'=> $year,
+            ':author'=> $author_id,
+            ':network'=>$network);
+        $ps = $this->execute($q, $vars);
+        $all_rows = $this->getDataRowsAsArrays($ps);
+        
+        // Get all the post ids of the checkins (we use this later for our link query) 
+        $post_keys_array = array();
+        foreach ($all_rows as $row) {
+            $post_keys_array[] = $row['id'];
+        }
+        
+        // An array to store each post object in for the checkins
+        $all_posts = array();
+        foreach ($all_rows as $row) {
+            // Not sure what this is but our checkins dont have one so we need to set it to a blank string
+            $row['adj_pub_date'] = "";
+            // Create a new post object from the row in the table
+            $data = new Post($row);
+           
+            // Get the place data from the database
+            $q1 = "SELECT * FROM #prefix#places WHERE place_id=:place";
+            $vars1 = array(
+                ':place'=>$row['place_id']);
+            $ps1 = $this->execute($q1, $vars1);
+            $place_row = $this->getDataRowsAsArrays($ps1);
+           
+            // Create a place object from the data in our table
+            $data->place_obj = new Place($place_row[0]);
+           
+            // Query for all the links related to these posts / checkins
+            $q2 = "SELECT * FROM #prefix#links WHERE post_key in (".implode(",", $post_keys_array).")";
+            $ps2 = $this->execute($q2);
+            $all_link_rows = $this->getDataRowsAsArrays($ps2);
+           
+            // For each link returned if it equals the post id of this post add the link to this post
+            foreach ($all_link_rows as $link_row) {
+                if ($link_row['post_key'] == $data->id) {
+                    $data->addLink(new Link($link_row));
+                }
+            } 
+           
+            // Now we have all the information for this post store it in our array of all posts 
+            $all_posts[] = $data;
+           
+        }
+           
+        return $all_posts; 
+    }
+       
+    /*
+     * Count the number of checkins to each place type 
+     */    
+    public function countCheckinsToPlaceTypes($author_id, $network) {
+                 
+        /* Get the ID of places this user has checked into from the posts table then find out what type
+         * of place this is from the places table group them by type and count how many of each type there are
+         */
+       
+        $q = "SELECT place_type, COUNT(place_type) FROM #prefix#places WHERE place_id IN ";
+        $q .= " (SELECT place_id FROM #prefix#posts WHERE author_user_id=:author AND network=:network)";
+        $q .= " GROUP BY place_type"; 
+        $vars = array(
+            'author'=>$author_id,
+            'network'=>$network);
+        $ps = $this->execute($q, $vars);
+        $all_rows = $this->getDataRowsAsArrays($ps); 
+       
+        return $all_rows;
+       
+    }
+    
+    /*
+     * Count the number of checkins per hour 
+     */    
+    public function countCheckinsPerHourAllTime($author_id, $network) {
+                 
+        // Get the number of checkins this person makes at each hour of the day
+
+        $q = "SELECT HOUR(pub_date), COUNT(HOUR(pub_date)) FROM #prefix#posts WHERE author_user_id=:author ";
+        $q .= " AND network=:network GROUP BY HOUR(pub_date)";
+        $vars = array(
+            'author'=>$author_id,
+            'network'=>$network);
+        $ps = $this->execute($q, $vars);
+        $all_rows = $this->getDataRowsAsArrays($ps); 
+       
+        return $all_rows;
+       
+    }
+    
+    /*
+     * Count the number of checkins per hour 
+     */    
+    public function countCheckinsPerHourLastWeek($author_id, $network) {
+                 
+        // Get the number of checkins this person makes at each hour of the day in the last week
+
+        $q = "SELECT HOUR(pub_date), COUNT(HOUR(pub_date)) FROM #prefix#posts WHERE author_user_id=:author ";
+        $q .= " AND network=:network AND YEARWEEK(pub_date) = YEARWEEK(CURRENT_DATE)"; 
+        $vars = array(
+            'author'=>$author_id,
+            'network'=>$network);
+        $ps = $this->execute($q, $vars);
+        $all_rows = $this->getDataRowsAsArrays($ps); 
+       
+        return $all_rows;
+       
+    }
+ 
+    
 }

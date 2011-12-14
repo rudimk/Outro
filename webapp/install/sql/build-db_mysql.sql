@@ -317,6 +317,8 @@ CREATE TABLE tu_places (
   network varchar(20) NOT NULL DEFAULT 'twitter' COMMENT 'The network this place appears on in lower-case, e.g. twitter or facebook.',
   longlat point DEFAULT NULL COMMENT 'Longitude/lattitude point.',
   bounding_box polygon DEFAULT NULL COMMENT 'Bounding box of place.',
+  icon varchar(255) DEFAULT NULL COMMENT 'Icon that represents the place',
+  map_image varchar(255) DEFAULT NULL COMMENT 'URL to a image of the map representing the area this location is in',
   PRIMARY KEY (id),
   UNIQUE KEY place_id (place_id,network)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='Places on a given network.';
@@ -482,7 +484,7 @@ CREATE TABLE tu_users (
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='Service user details.';
 
 
--- Dump completed on 2012-02-25  1:03:38
+-- Dump completed on 2012-02-25 10:49:31
 
 --
 -- Insert DB Version
